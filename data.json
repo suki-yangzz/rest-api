@@ -1,0 +1,9 @@
+{
+  "id": "1",
+  "firstname": "John",
+  "lastname": "Doe",
+  "address": {
+    "city": "City X",
+    "state": "State X"
+  }
+}

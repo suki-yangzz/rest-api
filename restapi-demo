@@ -1,0 +1,124 @@
+package main
+
+import (
+    "net/http"
+    "github.com/gorilla/mux"
+    "encoding/json"
+    "strings"
+    "net"
+    "strconv"
+    "log"
+)
+
+type Person struct {
+    ID        string   `json:"id,omitempty"`
+    Firstname string   `json:"firstname,omitempty"`
+    Lastname  string   `json:"lastname,omitempty"`
+    Address   *Address `json:"address,omitempty"`
+}
+type Address struct {
+    City  string `json:"city,omitempty"`
+    State string `json:"state,omitempty"`
+}
+
+var people []Person
+
+func GetPeople(w http.ResponseWriter, r *http.Request) {
+    json.NewEncoder(w).Encode(people)
+}
+func GetPerson(w http.ResponseWriter, r *http.Request) {
+    params := mux.Vars(r)
+    for _, item := range people {
+        if item.ID == params["id"] {
+            json.NewEncoder(w).Encode(item)
+            return
+        }
+    }
+    json.NewEncoder(w).Encode(&Person{})
+}
+func CreatePerson(w http.ResponseWriter, r *http.Request) {
+    params := mux.Vars(r)
+    var person Person
+    _ = json.NewDecoder(r.Body).Decode(&person)
+    person.ID = params["id"]
+    people = append(people, person)
+    json.NewEncoder(w).Encode(people)
+}
+func DeletePerson(w http.ResponseWriter, r *http.Request) {
+    params := mux.Vars(r)
+    for index, item := range people {
+        if item.ID == params["id"] {
+            people = append(people[:index], people[index+1:]...)
+            break
+        }
+        json.NewEncoder(w).Encode(people)
+    }
+}
+
+func getRealAddr(r *http.Request)  string {
+
+    remoteIP := ""
+    // the default is the originating ip. but we try to find better options because this is almost
+    // never the right IP
+    if parts := strings.Split(r.RemoteAddr, ":"); len(parts) == 2 {
+        remoteIP = parts[0]
+    }
+    // If we have a forwarded-for header, take the address from there
+    if xff := strings.Trim(r.Header.Get("X-Forwarded-For"), ","); len(xff) > 0 {
+        addrs := strings.Split(xff, ",")
+        lastFwd := addrs[len(addrs)-1]
+        if ip := net.ParseIP(lastFwd); ip != nil {
+            remoteIP = ip.String()
+        }
+        // parse X-Real-Ip header
+    } else if xri := r.Header.Get("X-Real-Ip"); len(xri) > 0 {
+        if ip := net.ParseIP(xri); ip != nil {
+            remoteIP = ip.String()
+        }
+    }
+
+    return remoteIP
+
+}
+
+//func (s *Worker) Run(c chan error) {
+//    apiMux := http.NewServeMux()
+//    apiMux.HandleFunc("/test", s.test)
+//    apiMux.HandleFunc("/block/create", s.CreateBlock)
+//    apiMux.HandleFunc("/block/delete", s.DeleteBlock)
+//
+//    apiServer := &http.Server{
+//        Addr:    "0.0.0.0:8080",
+//        Handler: http.HandlerFunc( func(w http.ResponseWriter, req *http.Request) {
+//            // get the real IP of the user, see below
+//            addr := getRealAddr(req)
+//
+//            // the actual vaildation - replace with whatever you want
+//            if (addr != "1.2.3.4") {
+//                http.Error(w, "Blocked", 401)
+//                return
+//            }
+//            // pass the request to the mux
+//            apiMux.ServeHTTP(w,req)
+//        }),
+//    }
+//
+//    go func() {
+//        log.Println("Worker listening on " + apiServer.Addr)
+//        c <- apiServer.ListenAndServe()
+//    }()
+//}
+
+// our main function
+//func main() {
+//    people = append(people, Person{ID: "1", Firstname: "John", Lastname: "Doe", Address: &Address{City: "City X", State: "State X"}})
+//    people = append(people, Person{ID: "2", Firstname: "Koko", Lastname: "Doe", Address: &Address{City: "City Z", State: "State Y"}})
+//    people = append(people, Person{ID: "3", Firstname: "Francis", Lastname: "Sunday"})
+//
+//    router := mux.NewRouter()
+//    router.HandleFunc("/people", GetPeople).Methods("GET")
+//    router.HandleFunc("/people/{id}", GetPerson).Methods("GET")
+//    router.HandleFunc("/people/{id}", CreatePerson).Methods("POST")
+//    router.HandleFunc("/people/{id}", DeletePerson).Methods("DELETE")
+//    log.Fatal(http.ListenAndServe(":8000", router))
+//}
